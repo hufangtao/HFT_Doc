@@ -19,7 +19,7 @@
 - repo：物品存储类型
   - 玩家背包
   - 仓库
-- id:数据库存储id
+- id:数据库存储id, 背包中的位置
 - player_id: 玩家id
 - goods_id: 物品id，例如buffid
 - count:物品数量
