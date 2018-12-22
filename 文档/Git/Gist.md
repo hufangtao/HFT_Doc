@@ -1,1 +1,3 @@
-60312d6587260e4344ca6f26cfe2761a600e4ac4
+GitHub Token: e586f950a3202cea6de96e0a5a02ea9fc282db70
+GitHub Gist: b7d16d8fd9d2eef498604f604854e3e9
+GitHub Gist Type: Secret
