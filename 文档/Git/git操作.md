@@ -1,6 +1,7 @@
 ## git操作
 
 #### 常用操作
+![blockchain](https://raw.githubusercontent.com/hufangtao/HFT_Doc/master/%E5%9B%BE%E7%89%87/290760-e8491f69473bf200.jpg "图片hover描述")
 
 
 #### http免密提交
