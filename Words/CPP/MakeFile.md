@@ -20,4 +20,26 @@ ifndef BOOST_1_56_0_INC
 endif
 ```
 
+## .PHONY
+### 问题
+添加一个Makefile的target的时，总会出现“make: Nothing to be done for `xxxxx’”的提示，而书写语法表面正确。
+### 原因
+Makefile的target和目录或文件名字冲突。
+```
+A phony target is one that is not really the name of a file;
+rather it is just a name for a recipe to be executed when you make an explicit request.
+There are two reasons to use a phony target:
+to avoid a conflict with a file of the same name, and to improve performance.
+If you write a rule whose recipe will not create the target file, the recipe will be executed every time the target comes up for remaking.
+```
+### 描述
+```phony的意思是“赝品”，在这里可以形象的理解成“不是文件”```
+### 问题
+GNU默认Makefile的taget是一个文件（或目录）
+他会检测同级目录下是否已存在这个文件，如果存在，则会abort掉make进程，并提示
+```
+make: Nothing to be done for `xxxx`
+```
+### 解决
+将target文件添加到phony中
 

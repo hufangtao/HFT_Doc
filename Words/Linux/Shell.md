@@ -38,3 +38,8 @@ done
 ```
 $(foreach <var>;,<list>;,<text>;)
 ```
+
+### 常用命令
+
+#### 压缩
+tar -czvf mypb.tar.gz pb
