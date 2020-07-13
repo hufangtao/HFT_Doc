@@ -1,5 +1,19 @@
+## MakeFile笔记
 
-## 语法
+### 基本规则
+```
+target ... : prerequisites
+	command
+	...
+	...
+```
+- target表示目标文件，可以是obj文件也可以是可执行文件，可以是单个或多个目标。
+- prerequisites是生成target所需要的文件或目标
+- command是make需要执行的命令（任意的shell命令）
+
+这是文件的依赖关系，target依赖于prerequisites中的文件，按照command命令生成。
+
+### 语法
 foreach循环
 names := a b c d
 files := $(foreach n,$(names),$(n).o)
