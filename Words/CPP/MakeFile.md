@@ -57,3 +57,5 @@ make: Nothing to be done for `xxxx`
 ### 解决
 将target文件添加到phony中
 
+#### 多目标
+
