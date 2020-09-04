@@ -340,9 +340,11 @@ typedef std_event event;
 #endif
 ```
 - posix_event
-
-在scheduler类中，用于唤醒阻塞的线程。使用条件变量pthread_cond_t相关函数实现线程唤醒
-
+```
+在scheduler类中
+当scheduler是多线程时，用于多线程之间的唤醒
+使用条件变量pthread_cond_t相关函数实现
+```
 源码
 ```
 class posix_event : private noncopyable
@@ -411,6 +413,9 @@ class scheduler_operation BOOST_ASIO_INHERIT_TRACKED_HANDLER
     unsigned int task_result_; // Passed into bytes transferred.
 };
 ```
+#### async_initiate
+异步初始换handler函数
+
 #### io_context_impl_初始化win_iocp
 #### 
 #### 向io_context提交任务
