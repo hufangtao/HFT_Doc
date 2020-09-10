@@ -274,39 +274,14 @@ class scheduler
       BOOST_ASIO_DECL std::size_t run(boost::system::error_code& ec);
     
     private:
-      // Whether to optimise for single-threaded use cases.
-      const bool one_thread_;
-      // Mutex to protect access to internal data.
-      mutable mutex mutex_;
-      // The count of unfinished work.
-      atomic_count outstanding_work_;
-
       // 时间管理大师 (线程之间通信管理)
-      // Event to wake up blocked threads.
       conditionally_enabled_event wakeup_event_;
 
-      // The task to be run by this service.
+      // 任务的真正执行者
       reactor* task_;
 
-      // 
-      // Operation object to represent the position of the task in the queue.
-      struct task_operation : operation
-      {
-        task_operation() : operation(0) {}
-      } task_operation_;
-
-
-      // The queue of handlers that are ready to be delivered.
+      // handler队列
       op_queue<operation> op_queue_;
-
-      // Flag to indicate that the dispatcher has been stopped.
-      bool stopped_;
-
-      // Flag to indicate that the dispatcher has been shut down.
-      bool shutdown_;
-
-      // The concurrency hint used to initialise the scheduler.
-      const int concurrency_hint_;
 
       // The thread that is running the scheduler.
       boost::asio::detail::thread* thread_;
@@ -413,8 +388,8 @@ class scheduler_operation BOOST_ASIO_INHERIT_TRACKED_HANDLER
     unsigned int task_result_; // Passed into bytes transferred.
 };
 ```
-#### async_initiate
-异步初始换handler函数
+#### reactor
+
 
 #### io_context_impl_初始化win_iocp
 #### 
