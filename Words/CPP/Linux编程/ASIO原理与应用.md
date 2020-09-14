@@ -1,4 +1,285 @@
 ## boost相关
+### ASIO原理
+
+#### ExecutionContext
+- execution_context
+
+用于让函数执行的上下文，io_context就是一个例子
+```
+class execution_context : private noncopyable
+{
+  public:
+    /// 构造
+    BOOST_ASIO_DECL execution_context();
+    /// 析构
+    BOOST_ASIO_DECL ~execution_context();
+
+  public:
+    class id;       // service id类用于唯一区分service
+    class service;  // 服务类
+  
+  private:
+    // 服务注册器
+    boost::asio::detail::service_registry* service_registry_;
+}
+
+```
+通过下列函数操作execution_context的services
+```
+template <typename Service> Service& use_service(execution_context&);
+template <typename Service> Service& use_service(io_context&);
+template <typename Service> void add_service(execution_context&, Service*);
+{
+  // 先检查Service和execution_context::service类型是否匹配
+  (void)static_cast<execution_context::service*>(static_cast<Service*>(0));
+
+  // 调用execution_context的服务注册器，注册服务
+  e.service_registry_->template add_service<Service>(svc);
+}
+template <typename Service> bool has_service(execution_context&);
+```
+- execution_context::service
+```
+/// Base class for all io_context services.
+class execution_context::service : private noncopyable
+{
+  public:
+    /// Get the context object that owns the service.
+    execution_context& context();
+
+  protected:
+    /// 构造函数.
+    /**
+    * @param owner The execution_context object that owns the service.
+    */
+    BOOST_ASIO_DECL service(execution_context& owner);
+  
+  private:
+    // 用于区分service的key
+    struct key
+      {
+        key() : type_info_(0), id_(0) {}
+        const std::type_info* type_info_;
+        const execution_context::id* id_;
+      } key_;
+
+      execution_context& owner_;  // 所属context
+      service* next_;             // 单链表引用
+}
+```
+- service_register
+
+服务器注册器：注册`execution_context::service`，以`service_key`为主键用单链表的方式保存`service`
+```
+class service_registry : private noncopyable
+{
+  public:
+    // Constructor.
+    BOOST_ASIO_DECL service_registry(execution_context& owner);
+  
+  private:
+  template <typename Service>
+  Service& use_service(io_context& owner);
+
+  // Add a service object. Throws on error, in which case ownership of the object is retained by the caller.
+  template <typename Service>
+  void add_service(Service* new_service);
+
+  // Check whether a service object of the specified type already exists.
+  template <typename Service>
+  bool has_service() const;
+
+  // Mutex to protect access to internal data.
+  mutable boost::asio::detail::mutex mutex_;
+
+  // The owner of this service registry and the services it contains.
+  execution_context& owner_;
+
+  // services服务链表头
+  execution_context::service* first_service_;
+}
+```
+#### io_context
+
+继承自`execution_context`，提供核心io功能和允许自定义异步服务
+
+源码：
+```
+class io_context : public execution_context
+  {
+    io_context()
+    : impl_(add_impl(new impl_type(*this,
+          BOOST_ASIO_CONCURRENCY_HINT_DEFAULT, false)))
+    {
+    }
+    io_context::impl_type& add_impl(io_context::impl_type* impl)
+    {
+      boost::asio::detail::scoped_ptr<impl_type> scoped_impl(impl);
+      boost::asio::add_service<impl_type>(*this, scoped_impl.get());
+      return *scoped_impl.release();
+    }
+
+    // 直接调用impl的run函数
+    io_context::count_type run(boost::system::error_code& ec)
+    {
+      return impl_.run(ec);
+    }
+
+    private:
+      // io_context的真实实现类
+      io_context_impl& io_context_impl_;
+  }
+```
+`io_context`的具体实现是`io_context_impl`，`window`下使用iocp完成端口设计，linux下使用scheduler调度器实现：
+```
+#if defined(BOOST_ASIO_HAS_IOCP)
+  typedef class win_iocp_io_context io_context_impl;
+  class win_iocp_overlapped_ptr;
+#else
+  typedef class scheduler io_context_impl;
+#endif
+```
+#### io_context_impl_初始化scheduler
+- scheduler调度器
+```
+class scheduler
+  : public execution_context_service_base<scheduler>,
+    public thread_context
+{
+    public:
+      // Constructor. Specifies the number of concurrent threads that are likely to
+      // run the scheduler. If set to 1 certain optimisation are performed.
+      BOOST_ASIO_DECL scheduler(boost::asio::execution_context& ctx, int concurrency_hint = 0, bool own_thread = true);
+      
+      // io_context的真实实现
+      // Run the event loop until interrupted or no more work.
+      BOOST_ASIO_DECL std::size_t run(boost::system::error_code& ec);
+    
+    private:
+      // 时间管理大师 (线程之间通信管理)
+      conditionally_enabled_event wakeup_event_;
+
+      // 任务的真正执行者
+      reactor* task_;
+
+      // handler队列
+      op_queue<operation> op_queue_;
+
+      // The thread that is running the scheduler.
+      boost::asio::detail::thread* thread_;
+```
+- conditionally_enabled_event
+
+封装了一层基于条件变量event
+```
+// Mutex adapter used to conditionally enable or disable locking.
+class conditionally_enabled_event
+  : private noncopyable
+{
+  public:
+    // Signal the event. (Retained for backward compatibility.)
+    void signal(conditionally_enabled_mutex::scoped_lock& lock)
+    {
+      if (lock.mutex_.enabled_)
+        event_.signal(lock);
+    }
+  private:
+    boost::asio::detail::event event_;
+};
+```
+不同情况下event的定义：
+```
+#if !defined(BOOST_ASIO_HAS_THREADS)
+typedef null_event event;
+#elif defined(BOOST_ASIO_WINDOWS)
+typedef win_event event;
+#elif defined(BOOST_ASIO_HAS_PTHREADS)
+typedef posix_event event;
+#elif defined(BOOST_ASIO_HAS_STD_MUTEX_AND_CONDVAR)
+typedef std_event event;
+#endif
+```
+- posix_event
+
+定义在scheduler类中，当scheduler是多线程时，用于多线程之间的唤醒，底层使用条件变量pthread_cond_t相关函数实现
+
+源码如下：
+```
+class posix_event : private noncopyable
+{
+  public:
+    // ConsPtructor.
+    BOOST_ASIO_DECL posix_event();
+
+    // If there's a waiter, unlock the mutex and signal it.
+    template <typename Lock>
+    bool maybe_unlock_and_signal_one(Lock& lock)
+    {
+      BOOST_ASIO_ASSERT(lock.locked());
+      state_ |= 1;
+      if (state_ > 1)
+      {
+        lock.unlock();
+        ::pthread_cond_signal(&cond_); // Ignore EINVAL.
+        return true;
+      }
+      return false;
+    }
+
+    // Wait for the event to become signalled.
+    template <typename Lock>
+    void wait(Lock& lock)
+    {
+      BOOST_ASIO_ASSERT(lock.locked());
+      while ((state_ & 1) == 0)
+      {
+        state_ += 2;
+        ::pthread_cond_wait(&cond_, &lock.mutex().mutex_); // Ignore EINVAL.
+        state_ -= 2;
+      }
+    }
+  private:
+    ::pthread_cond_t cond_;
+    std::size_t state_;
+};
+```
+- scheduler_operation
+
+用于表示所有操作的基类
+```
+class scheduler_operation BOOST_ASIO_INHERIT_TRACKED_HANDLER
+{
+  public:
+    // 一个操作完成时调用的函数，实际就是调用构造函数中传入的函数指针func
+    void complete(void* owner, const boost::system::error_code& ec, std::size_t bytes_transferred)
+    {
+      func_(owner, this, ec, bytes_transferred);
+    }
+  protected:
+    typedef void (*func_type)(void*, scheduler_operation*, const boost::system::error_code&, std::size_t);
+    scheduler_operation(func_type func)
+      : next_(0),
+        func_(func),
+        task_result_(0)
+      {
+      }
+  
+  private:
+    friend class op_queue_access;
+    scheduler_operation* next_;
+    func_type func_;
+  protected:
+    friend class scheduler;
+    unsigned int task_result_; // Passed into bytes transferred.
+};
+```
+
+#### reactor
+
+- epoll_reactor
+- descriptor
+
+-----------------
 
 ### ASIO应用
 #### 定时器
@@ -30,11 +311,6 @@
   ```
   strand_(boost::asio::make_strand(io)),
   ```
-
-#### 网络编程
-- 使用io_context声明socket
-  
-### asio基本原理
 
 #### 常见命名空间
 Boost.Asio的所有内容都包含在boost::asio命名空间或者其子命名空间内。
@@ -123,276 +399,3 @@ ip::tcp::socket = basic_stream_socket
 ip::udp::socket = basic_datagram_socket
 ip::icmp::socket = basic_raw_socket
 ```
-
-
-### ASIO原理
-#### ExecutionContext
-- execution_context
-用于让函数执行的上下文，io_context就是一个例子
-```
-class execution_context : private noncopyable
-{
-  public:
-    /// 构造
-    BOOST_ASIO_DECL execution_context();
-    /// 析构
-    BOOST_ASIO_DECL ~execution_context();
-
-  public:
-    class id;       // service id类用于唯一区分service
-    class service;  // 服务类
-  
-  private:
-    // 服务注册器
-    boost::asio::detail::service_registry* service_registry_;
-}
-
-// 通过下列函数操作execution_context的services
-template <typename Service> Service& use_service(execution_context&);
-template <typename Service> Service& use_service(io_context&);
-template <typename Service> void add_service(execution_context&, Service*);
-{
-  // 先检查Service和execution_context::service类型是否匹配
-  (void)static_cast<execution_context::service*>(static_cast<Service*>(0));
-
-  // 调用execution_context的服务注册器，注册服务
-  e.service_registry_->template add_service<Service>(svc);
-}
-template <typename Service> bool has_service(execution_context&);
-```
-- execution_context::service
-```
-/// Base class for all io_context services.
-class execution_context::service : private noncopyable
-{
-  public:
-    /// Get the context object that owns the service.
-    execution_context& context();
-
-  protected:
-    /// 构造函数.
-    /**
-    * @param owner The execution_context object that owns the service.
-    */
-    BOOST_ASIO_DECL service(execution_context& owner);
-  
-  private:
-    // 用于区分service的key
-    struct key
-      {
-        key() : type_info_(0), id_(0) {}
-        const std::type_info* type_info_;
-        const execution_context::id* id_;
-      } key_;
-
-      execution_context& owner_;  // 所属context
-      service* next_;             // 单链表引用
-}
-```
-- service_register
-服务器注册器：注册execution_context::service，以service_key为主键用单链表的方式保存service
-```
-class service_registry : private noncopyable
-{
-  public:
-    // Constructor.
-    BOOST_ASIO_DECL service_registry(execution_context& owner);
-  
-  private:
-  template <typename Service>
-  Service& use_service(io_context& owner);
-
-  // Add a service object. Throws on error, in which case ownership of the object is retained by the caller.
-  template <typename Service>
-  void add_service(Service* new_service);
-
-  // Check whether a service object of the specified type already exists.
-  template <typename Service>
-  bool has_service() const;
-
-  // Mutex to protect access to internal data.
-  mutable boost::asio::detail::mutex mutex_;
-
-  // The owner of this service registry and the services it contains.
-  execution_context& owner_;
-
-  // services服务链表头
-  execution_context::service* first_service_;
-}
-```
-- io_context
-提供核心io功能和允许自定义异步服务
-```
-class io_context : public execution_context
-  {
-    io_context()
-    : impl_(add_impl(new impl_type(*this,
-          BOOST_ASIO_CONCURRENCY_HINT_DEFAULT, false)))
-    {
-    }
-    io_context::impl_type& add_impl(io_context::impl_type* impl)
-    {
-      boost::asio::detail::scoped_ptr<impl_type> scoped_impl(impl);
-      boost::asio::add_service<impl_type>(*this, scoped_impl.get());
-      return *scoped_impl.release();
-    }
-
-    // 直接调用impl的run函数
-    io_context::count_type run(boost::system::error_code& ec)
-    {
-      return impl_.run(ec);
-    }
-
-    private:
-      // io_context的真实实现类
-      io_context_impl& io_context_impl_;
-  }
-```
-io_context_impl，window下使用iocp完成端口设计，linux下使用scheduler调度器设计
-```
-#if defined(BOOST_ASIO_HAS_IOCP)
-  typedef class win_iocp_io_context io_context_impl;
-  class win_iocp_overlapped_ptr;
-#else
-  typedef class scheduler io_context_impl;
-#endif
-```
-#### io_context_impl_初始化scheduler
-- scheduler调度器
-```
-class scheduler
-  : public execution_context_service_base<scheduler>,
-    public thread_context
-{
-    public:
-      // Constructor. Specifies the number of concurrent threads that are likely to
-      // run the scheduler. If set to 1 certain optimisation are performed.
-      BOOST_ASIO_DECL scheduler(boost::asio::execution_context& ctx, int concurrency_hint = 0, bool own_thread = true);
-      
-      // io_context的真实实现
-      // Run the event loop until interrupted or no more work.
-      BOOST_ASIO_DECL std::size_t run(boost::system::error_code& ec);
-    
-    private:
-      // 时间管理大师 (线程之间通信管理)
-      conditionally_enabled_event wakeup_event_;
-
-      // 任务的真正执行者
-      reactor* task_;
-
-      // handler队列
-      op_queue<operation> op_queue_;
-
-      // The thread that is running the scheduler.
-      boost::asio::detail::thread* thread_;
-```
-- conditionally_enabled_event
-```
-// Mutex adapter used to conditionally enable or disable locking.
-class conditionally_enabled_event
-  : private noncopyable
-{
-  public:
-    // Signal the event. (Retained for backward compatibility.)
-    void signal(conditionally_enabled_mutex::scoped_lock& lock)
-    {
-      if (lock.mutex_.enabled_)
-        event_.signal(lock);
-    }
-  private:
-    boost::asio::detail::event event_;
-};
-
-// event定义
-#if !defined(BOOST_ASIO_HAS_THREADS)
-typedef null_event event;
-#elif defined(BOOST_ASIO_WINDOWS)
-typedef win_event event;
-#elif defined(BOOST_ASIO_HAS_PTHREADS)
-typedef posix_event event;
-#elif defined(BOOST_ASIO_HAS_STD_MUTEX_AND_CONDVAR)
-typedef std_event event;
-#endif
-```
-- posix_event
-```
-在scheduler类中
-当scheduler是多线程时，用于多线程之间的唤醒
-使用条件变量pthread_cond_t相关函数实现
-```
-源码
-```
-class posix_event : private noncopyable
-{
-  public:
-    // ConsPtructor.
-    BOOST_ASIO_DECL posix_event();
-
-    // If there's a waiter, unlock the mutex and signal it.
-    template <typename Lock>
-    bool maybe_unlock_and_signal_one(Lock& lock)
-    {
-      BOOST_ASIO_ASSERT(lock.locked());
-      state_ |= 1;
-      if (state_ > 1)
-      {
-        lock.unlock();
-        ::pthread_cond_signal(&cond_); // Ignore EINVAL.
-        return true;
-      }
-      return false;
-    }
-
-    // Wait for the event to become signalled.
-    template <typename Lock>
-    void wait(Lock& lock)
-    {
-      BOOST_ASIO_ASSERT(lock.locked());
-      while ((state_ & 1) == 0)
-      {
-        state_ += 2;
-        ::pthread_cond_wait(&cond_, &lock.mutex().mutex_); // Ignore EINVAL.
-        state_ -= 2;
-      }
-    }
-  private:
-    ::pthread_cond_t cond_;
-    std::size_t state_;
-};
-```
-- scheduler_operation
-
-```
-class scheduler_operation BOOST_ASIO_INHERIT_TRACKED_HANDLER
-{
-  public:
-    void complete(void* owner, const boost::system::error_code& ec, std::size_t bytes_transferred)
-    {
-      func_(owner, this, ec, bytes_transferred);
-    }
-  protected:
-    typedef void (*func_type)(void*, scheduler_operation*, const boost::system::error_code&, std::size_t);
-    scheduler_operation(func_type func)
-      : next_(0),
-        func_(func),
-        task_result_(0)
-      {
-      }
-  
-  private:
-    friend class op_queue_access;
-    scheduler_operation* next_;
-    func_type func_;
-  protected:
-    friend class scheduler;
-    unsigned int task_result_; // Passed into bytes transferred.
-};
-```
-#### reactor
-
-
-#### io_context_impl_初始化win_iocp
-#### 
-#### 向io_context提交任务
-- 
-#### 
