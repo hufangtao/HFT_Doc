@@ -160,3 +160,6 @@
    - 内核等待数据准备完成，然后将数据拷贝到用户内存。当一切都完成之后，内核向用户进程发送一个`signal`，通知用户进程`read`操作完成
       
       ![blockchain](https://github.com/hufangtao/HFT_Doc/blob/master/Pictures/1127869-20181210212944334-1184572641.png?raw=true "图片hover描述")
+
+### epoll应用
+
