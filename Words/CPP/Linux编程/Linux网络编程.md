@@ -1,10 +1,13 @@
 ### getaddrinfo和getnameinfo
+#### getnameinfo
 `getnameinfo`是以一个套接口地址为参数，返回一个描述主机的字符串和一个描述服务的字符串。其函数原型如下：
 ```
 #include <netdb.h>
 int getnameinfo(const struct sockaddr *sockaddr, socklen_t addrlen, char *host, size_t hostlen, char *serv, size_t servlen, int flags);
 ```
 成功返回0，错误返回-1
+#### getaddrinfo
+
 
 ### sockaddr和sockaddr_in
 `struct sockaddr`和`struct sockaddr_in`这两个结构体用来处理网络通信的地址。一般的编程中并不直接对`struct sockaddr`进行操作，而使用`sockaddr_in`。

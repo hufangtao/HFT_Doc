@@ -1,4 +1,29 @@
 ## boost相关
+
+### Reactor模式
+
+#### event-driven architecture
+事件驱动体系结构是目前比较广泛使用的一种。这种方式会定义一系列的事件处理器来响应事件的发生，并且将服务端接受连接与对事件的处理分离。其中，事件是一种状态的改变。比如，tcp中socket的`new incoming connection、ready for read、ready for write`。
+
+reactor设计模式是event-driven architecture的一种实现方式，处理多个客户端并发的向服务端请求服务的场景。每种服务在服务端可能由多个方法组成。reactor会解耦并发请求的服务并分发给对应的事件处理器来处理。目前，许多流行的开源框架都用到了reactor模式，如：netty、node.js等，包括java的nio。
+
+reactor主要由以下几个角色构成：`handle、Synchronous Event Demultiplexer、Initiation Dispatcher、Event Handler、Concrete Event Handler`
+
+- Handle  
+handle在linux中一般称为文件描述符，而在window称为句柄，两者的含义一样。handle是事件的发源地。比如一个网络socket、磁盘文件等。而发生在handle上的事件可以有connection、ready for read、ready for write等。
+
+- Synchronous Event Demultiplexer  
+同步事件分离器，本质上是系统调用。比如linux中的select、poll、epoll等。比如，select方法会一直阻塞直到handle上有事件发生时才会返回。
+
+- Event Handler  
+事件处理器，其会定义一些回调方法或者称为钩子函数，当handle上有事件发生时，回调方法便会执行，一种事件处理机制。
+
+- Concrete Event Handler  
+具体的事件处理器，实现了Event Handler。在回调方法中会实现具体的业务逻辑。
+
+- Initiation Dispatcher  
+初始分发器，也是reactor角色，提供了注册、删除与转发event handler的方法。当Synchronous Event Demultiplexer检测到handle上有事件发生时，便会通知initiation dispatcher调用特定的event handler的回调方法。
+
 ### ASIO原理
 
 #### ExecutionContext
@@ -275,9 +300,77 @@ class scheduler_operation BOOST_ASIO_INHERIT_TRACKED_HANDLER
 ```
 
 #### reactor
+- epoll_reactor  
+事件分离器，linux下使用epoll实现。
+```
+class epoll_reactor
+  : public execution_context_service_base<epoll_reactor>
+{
+  // descriptor_state定义
+  class descriptor_state;
 
-- epoll_reactor
+  // Constructor.
+  BOOST_ASIO_DECL epoll_reactor(boost::asio::execution_context& ctx);
+  // Destructor.
+  BOOST_ASIO_DECL ~epoll_reactor();
+
+  // 注册一个槽位 新建一个descriptor_data并注册到epoll
+  BOOST_ASIO_DECL int register_descriptor(socket_type descriptor,
+      per_descriptor_data& descriptor_data);
+  
+  // Post a reactor operation for immediate completion.
+  void post_immediate_completion(reactor_op* op, bool is_continuation)
+  {
+    scheduler_.post_immediate_completion(op, is_continuation);
+  }
+
+  // 执行descriptor_data
+  BOOST_ASIO_DECL void start_op(int op_type, socket_type descriptor,
+      per_descriptor_data& descriptor_data, reactor_op* op,
+      bool is_continuation, bool allow_speculative);
+  
+  // Run epoll，对应io_context的run调用
+  BOOST_ASIO_DECL void run(long usec, op_queue<operation>& ops);
+
+  // epoll fd
+  int epoll_fd_;
+
+  // 时间，主要用于定时run任务
+  int timer_fd_;
+};
+```
+1. 各实现类：socket等在调用async_wait函数时，调用start_op开始执行epoll操作
+2. 在epoll操作结束之后，调用post_immediate_completion告知scheduler调度器，任务已经完成
+3. 调度器中，。
 - descriptor
+负责描述
+```
+// Per-descriptor queues.
+class descriptor_state : operation
+{
+  friend class epoll_reactor;
+  friend class object_pool_access;
+
+  descriptor_state* next_;
+  descriptor_state* prev_;
+
+  mutex mutex_;
+  epoll_reactor* reactor_;
+  int descriptor_;
+  uint32_t registered_events_;
+  op_queue<reactor_op> op_queue_[max_ops];
+  bool try_speculative_[max_ops];
+  bool shutdown_;
+
+  BOOST_ASIO_DECL descriptor_state(bool locking);
+  void set_ready_events(uint32_t events) { task_result_ = events; }
+  void add_ready_events(uint32_t events) { task_result_ |= events; }
+  BOOST_ASIO_DECL operation* perform_io(uint32_t events);
+  BOOST_ASIO_DECL static void do_complete(
+      void* owner, operation* base,
+      const boost::system::error_code& ec, std::size_t bytes_transferred);
+};
+```
 
 -----------------
 
