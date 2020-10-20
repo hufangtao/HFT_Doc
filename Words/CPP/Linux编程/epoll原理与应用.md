@@ -55,5 +55,6 @@ int epoll_wait(int epfd, struct epoll_event* events, int maxevents, int timeout)
 ```
 该函数会等待`epfd`的可用`events`。`events`指针指向的内存会包含所有可用的`event`。最多可回传`maxevents`个`events`。  
 可用`events`中包含的所有`epoll_event`结构数据，和用户用`epoll_ctl`设置的数据相同。而每个`epoll_event.events`字段中包含的是可用事件类型。  
+
 ## 原理
 
