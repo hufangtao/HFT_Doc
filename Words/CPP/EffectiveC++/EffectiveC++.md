@@ -189,4 +189,140 @@ public:
 - 非虚函数：具体指定接口继承，以及强制性实现继承
 
 ### 条款35：考虑virtual函数以外的其它选择
+本条款的根本忠告是，当你为解决问题而寻找某个设计方法时，不妨考虑虚函数的替代方案
+因为虚函数的作用非常明显，我们可能因此没有认真考虑其他替代方案。下面我们讨论一些虚函数的可替代方案。
+#### 使用非虚函数接口实现“函数模板”
+使用普通函数调用虚函数。让子类来实现虚函数自己的功能。而父类中的普通函数处理了其他通用逻辑，虚函数调用前的配置检查，调用后的通用逻辑处理等。  
+如果`addCurScore`定义为虚函数让子类调用，就没办法实现调用前的检查和调用后的处理了。
+```
+class GeneralActivity
+{
+  public:
+    void addCurScore()
+    {
+      // 通用配置检测
+      onAddCurScore();  // 虚函数，每个子类可另外实现
+      // 通用排行榜处理
+      // 通用奖励处理
+    }
+}
+```
+#### 使用“策略模式”
+asio中调度器的设计，为了兼容不同平台，采用策略模式实现reactor。`reactor`的定义可以是函数指针、`function`等
+```
+class scheduler
+{
+  // The task to be run by this service.
+  reactor* task_;
+}
+
+#if defined(BOOST_ASIO_HAS_IOCP) || defined(BOOST_ASIO_WINDOWS_RUNTIME)
+typedef class null_reactor reactor;
+#elif defined(BOOST_ASIO_HAS_IOCP)
+typedef class select_reactor reactor;
+#elif defined(BOOST_ASIO_HAS_EPOLL)
+typedef class epoll_reactor reactor;
+#elif defined(BOOST_ASIO_HAS_KQUEUE)
+typedef class kqueue_reactor reactor;
+#elif defined(BOOST_ASIO_HAS_DEV_POLL)
+typedef class dev_poll_reactor reactor;
+#else
+typedef class select_reactor reactor;
+#endif
+```
+
+### 条款36：绝不重新定义继承而来的非虚函数
+```
+class B
+{
+  public:
+    void mf();
+}
+class D: public B
+{
+}
+
+D x;
+B* b_ptr = &x;
+D* d_ptr = &x;
+
+b_ptr->mf();
+d_ptr->mf();
+```
+如果D中重写了mf，那么`d_ptr`和`b_ptr`调用`mf`的表现不一致。如果出现在函数参数调用等情况下，会导致类型一致但是表现不一致的情况。这种情况下，就违背了“D是一个B”的定义。  
+
+### 条款37：绝不重新定义继承而来的缺省值
+虚函数是动态绑定的，而缺省参数值确实静态绑定的。意思是你可能会在“调用一个定义于子类中的虚函数”的同事，却使用基类为它所指定的缺省参数值  
+- 在业务中尽量不要缺省参数，调用者需要明确知道自己要做的是什么事情。
+
+### 条款38：通过复合塑模出`has-a`或者“根据某物实现出”
+- 复合的意义和public继承完全不同
+
+### 条款39：明智而谨慎地使用private继承
+
+
+
+### 条款43：学习处理模板化基类内的名称
+```
+
+class CompanyA
+{
+    public:
+        void sendClearText()
+        {
+            printf("A: send clear text \n");
+        }
+
+        void sendEncrypted()
+        {
+            printf("A: send encrypted \n");
+        }
+};
+
+class CompanyB
+{
+    public:
+        void sendClearText()
+        {
+            printf("B: send clear text \n");
+        }
+
+        void sendEncrypted()
+        {
+            printf("B: send encrypted \n");
+        }
+};
+
+template<typename T>
+class MsgSender
+{
+    public:
+        void sendClear()
+        {
+            printf("MshSender: sendClear");
+            T t;
+            t.sendClearText();
+        }
+};
+
+template<>
+class MsgSender<CompanyA>
+{
+    public:
+        // 不定义sendclear
+};
+
+template<typename T>
+class LogMsgSender: public MsgSender<T>
+{
+    public:
+        void LogSendClear()
+        {
+            sendClear();
+        }
+};
+```
+上述代码会报编译错误，因为`Msgsender<T>`不一定存在`sendClear`函数。  
+一眼看起来`Msgsender`模板必定包含`sendClear`，但是考虑到`MsgSender`会有全特化的情况。  
+严格的编译器会报可能找不到`sendClear`的情况  
 
