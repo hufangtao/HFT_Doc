@@ -1,34 +1,25 @@
-## 工作记录、笔记、设计文档、参考文档
+# Initial page
 
-#### Cpp相关
-[Boost/Asio库](https://www.baidu.com "超链接hover描述")
-[Boost安装与使用](https://www.baidu.com "超链接hover描述")
-[GCC相关](https://www.baidu.com "超链接hover描述")
+## Getting Super Powers
 
-#### Erlang相关
-[Application](https://www.baidu.com "超链接hover描述")
-[四大behaviour](https://www.baidu.com "超链接hover描述")
-[自定义behaviour](https://www.baidu.com "超链接hover描述")
-[erlang游戏通信协议设计](https://www.baidu.com "超链接hover描述")
+Becoming a super hero is a fairly straight forward process:
 
-#### Git相关
-[Gist](https://www.baidu.com "超链接hover描述")
-[Git操作](https://www.baidu.com "超链接hover描述")
+```
+$ give me super-powers
+```
 
-#### Linux相关
-[常用软件](https://www.baidu.com "超链接hover描述")
-[常见问题](https://www.baidu.com "超链接hover描述")
+{% hint style="info" %}
+ Super-powers are granted randomly so please submit an issue if you're not happy with yours.
+{% endhint %}
 
-#### MarkDown语法
-[MarkDown语法](https://www.baidu.com "超链接hover描述")
+Once you're strong enough, save the world:
 
-#### 水果游戏设计
+{% code title="hello.sh" %}
+```bash
+# Ain't no code for that yet, sorry
+echo 'You got to trust me on this, I saved the world'
+```
+{% endcode %}
 
-#### 游戏设计
-[GateWay设计](https://www.baidu.com "超链接hover描述")
-[系统Log设计](https://www.baidu.com "超链接hover描述")
-[好友邀请设计](https://www.baidu.com "超链接hover描述")
 
-#### 游戏通信
-[Protobuf Api 详解](https://www.baidu.com "超链接hover描述")
-[Protobuf 安装](https://www.baidu.com "超链接hover描述")
+
