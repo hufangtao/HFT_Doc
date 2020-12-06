@@ -164,6 +164,7 @@ inline函数，看起来像函数、行为也像函数，比宏好用，可以�
 - 如果使用引用和指针可以完成任务，就不要使用对象。你可以靠一个类型的声明式就定义出指向该类型的引用和指针；但如果定义某类型的对象，就需要用到该类型的定义式。
 - 尽量以class声明式替换class定义式。注意，当你声明一个函数而它用到某个class时，你并不需要该class的定义；纵使函数以传值的方式传递该类型的参数亦然。
 
+----
 
 ## 继承与面向对象设计
 ### 条款32：确定你的public继承塑模出is-a关系
@@ -189,17 +190,268 @@ public:
 - 非虚函数：具体指定接口继承，以及强制性实现继承
 
 ### 条款35：考虑virtual函数以外的其它选择
+本条款的根本忠告是，当你为解决问题而寻找某个设计方法时，不妨考虑虚函数的替代方案
+因为虚函数的作用非常明显，我们可能因此没有认真考虑其他替代方案。下面我们讨论一些虚函数的可替代方案。
+#### 使用非虚函数接口实现“函数模板”
+使用普通函数调用虚函数。让子类来实现虚函数自己的功能。而父类中的普通函数处理了其他通用逻辑，虚函数调用前的配置检查，调用后的通用逻辑处理等。  
+如果`addCurScore`定义为虚函数让子类调用，就没办法实现调用前的检查和调用后的处理了。
+```
+class GeneralActivity
+{
+  public:
+    void addCurScore()
+    {
+      // 通用配置检测
+      onAddCurScore();  // 虚函数，每个子类可另外实现
+      // 通用排行榜处理
+      // 通用奖励处理
+    }
+}
+```
+#### 使用“策略模式”
+asio中调度器的设计，为了兼容不同平台，采用策略模式实现reactor。`reactor`的定义可以是函数指针、`function`等
+```
+class scheduler
+{
+  // The task to be run by this service.
+  reactor* task_;
+}
+
+#if defined(BOOST_ASIO_HAS_IOCP) || defined(BOOST_ASIO_WINDOWS_RUNTIME)
+typedef class null_reactor reactor;
+#elif defined(BOOST_ASIO_HAS_IOCP)
+typedef class select_reactor reactor;
+#elif defined(BOOST_ASIO_HAS_EPOLL)
+typedef class epoll_reactor reactor;
+#elif defined(BOOST_ASIO_HAS_KQUEUE)
+typedef class kqueue_reactor reactor;
+#elif defined(BOOST_ASIO_HAS_DEV_POLL)
+typedef class dev_poll_reactor reactor;
+#else
+typedef class select_reactor reactor;
+#endif
+```
+
+### 条款36：绝不重新定义继承而来的非虚函数
+```
+class B
+{
+  public:
+    void mf();
+}
+class D: public B
+{
+}
+
+D x;
+B* b_ptr = &x;
+D* d_ptr = &x;
+
+b_ptr->mf();
+d_ptr->mf();
+```
+如果D中重写了mf，那么`d_ptr`和`b_ptr`调用`mf`的表现不一致。如果出现在函数参数调用等情况下，会导致类型一致但是表现不一致的情况。这种情况下，就违背了“D是一个B”的定义。  
+
+### 条款37：绝不重新定义继承而来的缺省值
+虚函数是动态绑定的，而缺省参数值确实静态绑定的。意思是你可能会在“调用一个定义于子类中的虚函数”的同事，却使用基类为它所指定的缺省参数值  
+- 在业务中尽量不要缺省参数，调用者需要明确知道自己要做的是什么事情。
+
+### 条款38：通过复合塑模出`has-a`或者“根据某物实现出”
+- 复合的意义和public继承完全不同
+
+### 条款39：明智而谨慎地使用private继承
+- 一般在需要Base类的一些功能，但是又不需要其他类来调用，可以考虑使用private继承
+
+在工程中，我们一般考虑将功能分类设计为静态Utils类，用于开发
 
 
-### 
+### 条款40：明智而谨慎得使用多重继承
+多重继承只是面向对象工具箱的一个工具而已。和单一继承比较。它通常比较复杂，使用上也比较难以理解，所以如果有单一继承的设计方案，尽量采用单一继承方案。  
+- 多重继承比单一继承复杂。他可能导致新的歧义性，比如虚继承。
+- 虚继承会增加大小、速度、初始化（赋值）复杂度等成本。如果虚基类不带任何数据，将是最具使用价值的情况。
+  只使用最基本的接口设计，不在虚基类中设计任何数据。  
+- 两个比较使用多重继承的地方：
+  1. `public`继承某个`Interface class`
+  2. `private`继承某个协助实现类
+
+## 7 模板与泛型编程
+模板的最初动机很直接：让我们得以建立“类型安全”的容器如vector、list和map。
+
+### 条款41：了解隐式接口和编译器多态
+面向对象编程世界总是以显式接口和运行期多态解决问题。
+- 类和模板都是支持接口和多态的  
+- 类接口是显式的，以函数签名为中心。多态则是通过虚函数发生于运行期
+- 模板接口是隐式的，多态则是通过模板具现化和函数重载解析发生于编译器。
+
+### 条款42：typename的双重定义
 
 
+### 条款43：学习处理模板化基类内的名称
+```
+class CompanyA
+{
+    public:
+        void sendClearText()
+        {
+            printf("A: send clear text \n");
+        }
+
+        void sendEncrypted()
+        {
+            printf("A: send encrypted \n");
+        }
+};
+
+class CompanyB
+{
+    public:
+        void sendClearText()
+        {
+            printf("B: send clear text \n");
+        }
+
+        void sendEncrypted()
+        {
+            printf("B: send encrypted \n");
+        }
+};
+
+template<typename T>
+class MsgSender
+{
+    public:
+        void sendClear()
+        {
+            printf("MshSender: sendClear");
+            T t;
+            t.sendClearText();
+        }
+};
+
+template<>
+class MsgSender<CompanyA>
+{
+    public:
+        // 不定义sendclear
+};
+
+template<typename T>
+class LogMsgSender: public MsgSender<T>
+{
+    public:
+        void LogSendClear()
+        {
+            sendClear();
+        }
+};
+```
+上述代码会报编译错误，因为`Msgsender<T>`不一定存在`sendClear`函数。  
+一眼看起来`Msgsender`模板必定包含`sendClear`，但是考虑到`MsgSender`会有全特化的情况。  
+严格的编译器会报可能找不到`sendClear`的情况  
+
+### 条款45：运用成员函数模板接受所有兼容类型
+- 使用成员函数模板生成“可接受所有兼容类型”的函数。一些隐式转换的实现
+```
+template<typename T>
+class SmartPtr
+{
+    public:
+      SmartPtr(T* real_ptr);
+};
+```
+
+假如B、D两个类存在继承关系。但是`SmartPtr<B>`和`SmartPtr<D>`之间是没有继承关系的。  
+为了获得SmartPtr class之间的转换关系，我们必须明确写出来。
+```
+template<typename T>
+class SmartPtr
+{
+    public:
+      template<typename U>
+      // 编译器这边ptr的初始化会判断出是否有转换关系
+      SmartPtr(const SmartPtr<U>& other) : ptr(other.get());
+
+      T* get() const {return ptr;}
+    private:
+      T* ptr;
+};
+```
+- 在使用成员函数模板用于构造和复制操作函数时，我们还是需要声明正常的拷贝构造和复制构造操作符的。  
+
+### 条款46：需要类型转换时请为模板定义非成员函数
 
 
+### 条款47：请使用`traits classes`表现类型信息
+`Traits`并不是C++关键字或一个预先定义好的构件；它们是一种技术，也是一个C++程序员共同遵守的协议。  
 
+### 条款48：认识模板元编程
+模板元编程是编写生成或操作程序的程序，也是一种复杂且功能强大的编程范式。  
+C++模板给C++提供了元编程的能力，但大部分用户对C++模板的使用并不是很频繁，大致限于泛型编程，尤其对通用性、性能要求极高的基础库（如STL、Boost）。  
+例如：使用模板在编译器计算斐波那契数列就是典型的模板元编程
+```
+template<unsigned n>
+struct Fac {
+  enum { value = n * Fac<n-1>::value};
+};
 
+template<>
+struct Fac<0> {
+  enum {value = 1};
+}
+```
+因为是编译期编程，所以正常的编程结构都不能用，所以模板元编程组成要素：
+- 递归实现循环结构
+- 模板的特例化提供条件判断能力
+- 配合枚举常亮、继承等
+- 模板元可将工作由运行期移往编译期，因而得以实现早期错误侦测和更高的执行效率。
 
+## 8 定制new和delete
+### 条款49：了解new-handler的行为
+- set_new_handler允许客户指定一个函数，在内存分配无法获得满足时被调用。
+- nothrow new的应用：
+分配失败便抛出bad_alloc异常，当使用std::nothrow形式时分配失败返回null。  
+因为构造函数可以做它想做的任何事。它有可能有new一些内存，而没人可以强迫它再次使用nothrow new。  
+因此`new (std::nothrow)`调用的operator new并不抛出异常，但构造函数可能会。  
+因此我们其实没有运用nothrow new的需要。
 
+### 条款50：了解new和delete的合理替换时机
+何时替换编译器提供的new和delete
+- 用来检测运用错误
+- 强化operator的能力
+- 收集使用上的统计数据
+- 为了增加分配和归还的速度（对象池）
+- 为了降低缺省内存管理器带来的空间额外开销
+- 为了弥补缺省分配器中的非最佳对齐
+- 为了获得定制化需求
+  
+### 条款51：编写new和delete时需固守常规
+- new应该内含一个无穷循环，并在其中尝试分配内存，如果无法满足内存需求，就该调用new-handler。
+- new应该有能力处理0bytes申请。
+- delete收到null指针时不做任何事。
 
+### 条款52：写了placement new也要写placement delete
+class new
+对象自定义new，可
+```
+void* operator new(std::size_t) throw(std::bad_alloc);  // 普通new
+void* operator new(std::size_t, void*) throw(std::bad_alloc);  // placement new
+可以根据void*定制对象的位置，所以叫placement
+void* operator new(std::size_t, const std::nothrow_t&) throw();  // 普通new
+```
+global new：
+负责所有对象默认new
 
+- 一般的，自定义的new必须要对应的delete。
 
+## 9 杂项讨论
+### 条款53：不要轻易忽视编译器的warning
+- 编译时使用-Werror把所有warning转为error
+
+### 条款54：让自己熟悉包括TR1在内的标准程序库
+常见的组件
+- 智能指针
+- function
+- bind
+
+### 条款55：让自己熟悉Boost
+Boost很多特性已经被引入C++11、17、20。可以直接升级C++版本尽量使用标准版本。
