@@ -119,5 +119,49 @@ Session::~Session
 可以考虑使用try...catch包裹
 
 ### 条款12：了解“抛出一个异常”和“传递一个参数”或“调用一个虚函数”之间的差异
-- 传递参数：正常理解，引用传参不会发生复制。
-- 抛异常：总是发生复制，无论以何种方式接受参数
+函数参数的声明语法和catch子句的声明语法，简直如出一辙
+```
+class Widget {...}  // 某个类
+
+void f1(Widget w);
+void f2(Widget& w);
+void f3(Widget* w);
+
+catch (Widget w)
+catch (Widget& w)
+catch (Widget* w)
+```
+#### 传值方式
+相同点：
+- 函数参数和异常的传递方式都包括：传值、引用和指针
+不同点：
+- 函数的调用最终返回到调用处，异常不会再回到抛出段。
+
+```
+void processAndThrowWidget()
+{
+	Widget local_widget;
+
+	throw local_widget;
+}
+```
+离开processAndThrowWidget之后，local_widget会被析构。所以local_widget总是被复制抛出，复制调用copy构造函数。
+1. 异常首先复制出一个临时对象。所以千万不要抛出一个指针异常
+2. 将临时对象传递给catch
+
+#### 传值的隐式转换
+- 函数参数支持隐式转换
+- 异常传参仅有两种情况可以转换
+  1. 类继承，宝库针对runtime_errors而写的catch子句
+  2. 第二种转换，是有形指针转为无形指针，
+
+#### 匹配方式
+- 异常从前往后依次匹配
+- 函数匹配最优解
+
+### 条款13：以引用方式捕捉异常
+- 传值：两次复制，无法析构子类赋值。
+- 指针：复制指针，指向内存已经被析构。
+
+### 条款14：明智运用`exception specifications`
+
