@@ -100,7 +100,11 @@ endif
 
 执行curl
 
-## 编程流程（multi）
+## 多线程异步编程流程（multi）
+
+`libcurl`的官方文档中说是线程安全的，
+
+但其实，涉及到`easy handle`的内容都不是安全的，都需要加锁处理。只能在一个线程操作`easy handle`
 
 1. 调用`curl_multi_init`初始化一个`multi curl`对象
 2. 调用`curl_easy_init`初始化多个`easy curl`对象
