@@ -2,7 +2,7 @@
 - 探测进程
     常用命令：ps -elf
 - 实时监控
-    
+  
 ### 磁盘检查
 - 磁盘容量
     df -h
@@ -20,14 +20,39 @@
     -v 反向搜索
     -n 行数
     -c count
-
 - 压缩
     gzip myprog
-
 - 归档tar
     -z 表示将输出重定向给gzip亚索
     tar -zxvf data.tar
     tar -zcvf test.tar data/
+
+### scp命令
+
+```shell
+scp -P 58422 data_202104221650.tar.gz fangtao.hu@10.9.30.115:/home/fangtao.hu/serverCode/app/bhxy3/trunk/gameserver
+```
+
+### 软链
+
+```shell
+ln -s ../gameserver/data data
+```
+
+
+
+
+
+## 网络检测
+
+### netstate
+
+### ss
+
+- `ss`网络连接基本状态
+- `ss -s` 显示套接字摘要
+- `ss -l`显示监听状态的套接字
+- `ss -a`显示所有套接字
 
 
 # Shell
