@@ -2,7 +2,6 @@
 - 探测进程
     常用命令：ps -elf
 - 实时监控
-  
 ### 磁盘检查
 - 磁盘容量
     df -h
@@ -132,7 +131,6 @@ echo ${myarray[*]}
     
     - passwd和chpasswd  修改用户密码
         passpwd fangtao.hu
-    
 ## 7.2 Linux组
 - /etc/group
     包含系统上用到的每个组的信息。
@@ -165,5 +163,4 @@ echo ${myarray[*]}
 
 # 编辑器
 ## vim编辑器
-
 

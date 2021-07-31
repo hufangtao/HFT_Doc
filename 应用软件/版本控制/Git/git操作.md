@@ -1,5 +1,20 @@
 ## git操作
 
+### git lfs
+
+1. 安装去`lfs`官网教程
+2. 其它参考命令`git lfs --help`
+
+### git ssh 免密提交
+
+```bash
+cd ~/.ssh/
+ssh-keygen -t rsa -C hufangta@qq.com
+把id_rsa.pub复制到github的setting
+```
+
+
+
 #### 优秀参考文献
 [图解Git](https://marklodato.github.io/visual-git-guide/index-zh-cn.html "图解Git")
 
@@ -40,3 +55,4 @@ $ git branch
 因为9b7039a包含了一次提交，所以解决方案分为两种：
 第一种：这些提交不重要，那直接checkout master分支即可。
 第二种：这些分支的代码很重要，那创建一个新分支A指向9b7039a。然后checkout主分支，merge A到master上即可。
+

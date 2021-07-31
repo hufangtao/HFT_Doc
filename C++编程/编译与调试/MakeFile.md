@@ -148,4 +148,42 @@ ifndef：与ifdef相反
 $(<function>; <arguments>;)
 ```
 
+## 应用
 
+### 自动生成依赖关系
+
+**参考：**https://blog.51cto.com/u_11134889/2108280
+
+一般C++的Makefiel中，目标的编译语法都是：
+
+```shell
+$(OUT_DIR)/%.o: %.cpp
+	$(XX) $(C_FLAGS) -c $< -o $@
+```
+
+目标`.o`文件只依赖`.cpp`文件，只有`.cpp`文件变动时，才会重新编译。如果我们修改了头文件，并不会重新编译，会导致错误。
+
+为了弥补错误。我们在Makefile要手动创造这种依赖。这就是`dep`的作用。
+
+**实现前提1：**GCC通过`-MM`参数，可以获取本文件依赖的文件。因为这个地方出来的是`haclient_mgr.o`不带路径，一般用`sed`来为他加上路径，例如`out/haclient_mgr.o`。`sed`命令一般为`sed 's,\(.*\)\.o[:],'$(OUT_DIR)'\/\1.o: ,g'`
+
+```bash
+[fangtao.hu@bh3dev4 code]$ gcc -MM hnet/asio_client/haclient_mgr.h -I./
+haclient_mgr.o: hnet/asio_client/haclient_mgr.h ext_head.h \
+ tools/thread_group.h hlog/hlogger.h hlog/hlog_stream.h \
+ tools/noncopyable.h tools/fixed_buffer.h hlog/log_file_mgr.h \
+ tools/file_utils.h tools/noncopyable.h
+```
+
+**实现前提2：**对于一个目标，可以声明多次依赖。最终目标是多次依赖的合集
+
+```makefile
+test: a b
+
+test: b c
+# test最终结果是 a、b、c
+```
+
+**实现前提3：** `Makefile`里的`include`关键字，是直接替换内容。如果被include的文件不存在，会根据对应规则生成。
+
+**最终实现：**通过`gcc -MM`获取`cpp`文件的依赖，并用include包含进Makefile。

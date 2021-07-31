@@ -1,4 +1,4 @@
-# 文本三剑客`grep`、`awk`、`sed`
+# 文本处理
 
 ## `grep`
 
@@ -10,9 +10,17 @@ grep pattern file_name
 
 ## `awk`
 
-
+awk -f
 
 ## `sed`
+
+基本语法：`sed [选项] [脚本命令] 文件名`
+
+#### 选项  
+
+
+
+#### 脚本
 
 
 
