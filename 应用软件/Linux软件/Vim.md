@@ -25,3 +25,15 @@ Ctrl+ww——依次向后切换到下一个窗格中
 ```
 ### 删除所有内容
 gg 这里是跳至文件首行 再执行：dG 
+
+### vim升级8.0
+
+没啥用，对linux版本有要求。
+
+```shell
+rpm -Uvh http://mirror.ghettoforge.org/distributions/gf/gf-release-latest.gf.el7.noarch.rpm
+rpm --import http://mirror.ghettoforge.org/distributions/gf/RPM-GPG-KEY-gf.el7
+yum -y remove vim-minimal vim-common vim-enhanced sudo
+yum -y --enablerepo=gf-plus install vim-enhanced sudo
+```
+
