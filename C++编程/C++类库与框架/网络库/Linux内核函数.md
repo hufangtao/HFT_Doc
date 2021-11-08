@@ -58,3 +58,20 @@ struct iovec{
 
 依次填充`iovec`所指向的内存。每块内存用一个`iovec`的元素来表示。
 
+### getsockname和getpeername函数
+
+定义如下：
+
+```c++
+#include <sys/socket.h>
+
+// 获取套接字关联的本地协议地址
+int getsockname(int sockfd, struct sockaddr* localaddr, socklen_t* addrlen);
+// 获取套接字关联的外地协议地址
+int getpeername(int sockfd, struct sockaddr* peeraddr,  socklen_t* addrlen);
+```
+
+
+
+
+

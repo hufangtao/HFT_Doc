@@ -20,12 +20,14 @@
 
 ### Poller
 
-负责IO多路复用，监听fd对应的事件。向Channel填充事件
+负责IO多路复用，监听fd对应的事件。向Channel填充事件。可以使用poll或者epoll作为底层实现。
 
 ### Channel
 
 负责管理fd，设置和处理对应的事件回调。
 
-### TimerQueue
+### Connector
 
-基于EventLoop实现一个定时器功能。定时器的实现其实多种多样，TimerWheel形式之类的。
+负责client端的连接管理，主要负责处理client_fd的重连、连接等。做了一个负责连接的状态机，如果出错会自动生成新sock_fd，并重置channel，重置callback。
+
+一般的，是否可以直接用while来做？整得这么麻烦谁看得懂。还需要考虑解决client_mgr的问题。
